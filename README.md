@@ -6,10 +6,12 @@ This workspace serves local GGUF models through a CUDA-enabled `llama.cpp` API a
 
 | Model | Local size | Context here | Codex | jcode | DeepSeek Harness |
 | --- | ---: | ---: | --- | --- | --- |
-| Qwen3.8-27B Q6_K_L | 24.2 GB | 65,536 | Tested | Tested, including bash tool | Tested, including bash tool |
+| Qwen3.8-27B Q5_K_M (daily driver) | 19.8 GB | 65,536 | Tested | Tested, including bash tool | Tested, including bash tool |
+| Qwen3.8-27B Q6_K_L (quality profile) | 24.2 GB | 65,536 | Tested | Tested | Tested |
+| Qwen3.8-27B Q4_K_XL (fast profile) | 17.6 GB | 65,536 | Benchmark only | Benchmark only | Benchmark only |
 | DeepSeek-V4-Flash-0731 Q2_K_S | 98.6 GB | 8,192 | Not configured | Configured | Configured |
 
-Qwen is installed and is the recommended daily driver. The DeepSeek download and launch path is ready, but the 98.6 GB model has intentionally not been downloaded automatically.
+Qwen Q5_K_M is installed and is the recommended daily driver. The DeepSeek download and launch path is ready, but the 98.6 GB model has intentionally not been downloaded automatically.
 
 DeepSeek-V4-Pro-0813 is the newest official DeepSeek checkpoint. Its official weights are about 893 GB, so it cannot run in the 128 GB unified memory of one DGX Spark. Flash-0731 is the newest V4 variant with a remotely plausible one-Spark quantization, but its aggressive 2-bit GGUF is experimental and can lose meaningful quality.
 
@@ -52,6 +54,34 @@ One-shot examples:
 ./jcode-qwen run "Explain this repository"
 ./dsh-qwen --profile headless "Explain this repository"
 ```
+
+### Configure jcode reasoning
+
+`jcode-qwen` and the Qwen server read repo-local defaults from `.env`. A
+balanced reasoning and measured DGX Spark server profile has already been
+created locally; `.env` is ignored by Git and will not be published. To
+reproduce it elsewhere:
+
+```bash
+cp .env.example .env
+```
+
+The default uses low reasoning with a 2,048-token reasoning budget. For the
+fastest routine work, set `QWEN_REASONING_EFFORT=none`; for harder work use
+`medium` or `xhigh`. A budget of `-1` removes the explicit reasoning limit.
+Values supplied directly in the shell override `.env`, for example:
+
+```bash
+QWEN_REASONING_EFFORT=none ./jcode-qwen
+```
+
+The budget controls reasoning tokens, not the length of the final answer. For
+advanced request fields, set `JCODE_OPENAI_EXTRA_BODY` to a complete JSON
+object; it takes precedence over the two friendly reasoning variables.
+
+The same file holds the server tuning switches. Explicit values supplied in
+the shell always win, which makes one-variable trials easy without editing the
+file. `start.sh` inherits these settings through `serve.sh`.
 
 The validated tool-loop prompts were:
 
@@ -119,7 +149,7 @@ Qwen:
 
 - API: `http://127.0.0.1:30000/v1`
 - Model ID: `Qwen/Qwen3.8-27B`
-- Model: Q6_K_L plus vision projector and MTP draft head
+- Model: Q5_K_M plus vision projector and MTP draft head
 
 DeepSeek:
 
@@ -144,7 +174,18 @@ Useful server commands:
 | --- | --- | --- |
 | `QWEN_API_PORT` | `30000` | Qwen port |
 | `QWEN_CTX_SIZE` | `65536` | Qwen server and wrapper context |
-| `QWEN_MODEL_FILE` | Q6_K_L path | Alternative Qwen GGUF |
+| `QWEN_MODEL_FILE` | Q5_K_M path | Alternative Qwen GGUF |
+| `QWEN_SERVER_BIN` | optimized build | Alternative `llama-server` binary for A/B tests |
+| `QWEN_REASONING_EFFORT` | `low` | jcode reasoning: `none`, `low`, `medium`, or `xhigh` |
+| `QWEN_REASONING_BUDGET_TOKENS` | `2048` | jcode reasoning cap; `-1` is unlimited |
+| `JCODE_OPENAI_EXTRA_BODY` | generated | Complete jcode request-body JSON override |
+| `QWEN_MTP_DRAFT_N_MAX` | `3` | MTP draft depth |
+| `QWEN_BATCH_SIZE` | `2048` | Logical prompt batch size |
+| `QWEN_UBATCH_SIZE` | `512` | Physical prompt batch size |
+| `QWEN_BACKEND_SAMPLING` | `0` | Experimental target backend sampling (`0`/`1`) |
+| `QWEN_LOAD_MODE` | `auto` | Model load mode, including experimental `dio` |
+| `QWEN_CUDA_GRAPH_OPT` | `0` | Opt-in CUDA graph optimization (`0`/`1`) |
+| `QWEN_CUDA_CUB_3DOT2` | `OFF` | Build-time NVIDIA CUB 3.2 path (`ON`/`OFF`) |
 | `DEEPSEEK_API_PORT` | `30001` | DeepSeek port |
 | `DEEPSEEK_CTX_SIZE` | `8192` | Experimental DeepSeek context |
 | `DEEPSEEK_MODEL_FILE` | Q2_K_S shard 1 | Alternative DeepSeek GGUF |
@@ -156,6 +197,45 @@ The jcode wrappers honor port and context overrides dynamically. DeepSeek Harnes
 ```bash
 ./scripts/build.sh
 ./scripts/download-model.sh
+./scripts/download-quant-comparison.sh
+```
+
+The normal download installs the recommended Q5_K_M target. The optional
+comparison download adds the pinned Q6_K_L and Q4_K_XL targets used by the
+performance sweep. Model files remain under the ignored `models/` directory.
+
+### Measured DGX Spark profile
+
+The local SPEED-Bench coding sweep used identical prompts, temperature 0,
+reasoning disabled, one server slot, Q8 K/V, Flash Attention, and the same MTP
+head. The final back-to-back results were:
+
+| Trial | Decode tok/s | Decision |
+| --- | ---: | --- |
+| Q6, MTP 3, non-CUB | 26.57 | Quality profile |
+| Q5, MTP 3, non-CUB | 32.03 | Default |
+| Q4, MTP 3, non-CUB | 34.76 | Fast profile; larger quality tradeoff |
+| Q5 plus backend sampling | 31.96 | Keep off |
+| Q5 plus CUDA graph optimization | 31.84 | Keep off |
+| Q5 plus Direct I/O | 31.86 | Keep `auto` |
+
+On Q6, MTP depth 3 beat depth 2 by 24% in the coding sample. Ubatch 2048 did
+not hold its apparent one-prompt prefill gain across the expanded sample, so
+512 remains the lower-memory default. The CUB 3.2 build measured 24.01 tok/s
+against 26.57 without it, so it is available as an opt-in experiment rather
+than enabled by default. These are local workload measurements, not universal
+rankings; keep Q6 when its extra quantization quality avoids repair turns.
+
+To select another installed target for one launch:
+
+```bash
+./scripts/stop.sh
+QWEN_MODEL_FILE="$PWD/models/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q6_K_L.gguf" \
+  ./scripts/start.sh
+
+./scripts/stop.sh
+QWEN_MODEL_FILE="$PWD/models/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf" \
+  ./scripts/start.sh
 ```
 
 The llama.cpp build follows NVIDIA's [DGX Spark recipe](https://build.nvidia.com/spark/llama-cpp/instructions) and targets GB10 `sm_121a`. Downloads are pinned for reproducibility:
@@ -163,7 +243,7 @@ The llama.cpp build follows NVIDIA's [DGX Spark recipe](https://build.nvidia.com
 - Qwen GGUF revision: `990216cf312573f2ac4060279848e0f4237600c7`
 - DeepSeek GGUF revision: `f559fd6005309e5f6bd650342ee8711ff189b3b8`
 
-The source-backed feasibility and compatibility notes are in [the research report](docs/multi-harness-deepseek-research.md).
+The source-backed feasibility and compatibility notes are in [the harness research report](docs/multi-harness-deepseek-research.md). The DGX Spark tuning rationale and local measurements are in [the performance report](docs/dgx-spark-performance-research.md).
 
 ## License
 

@@ -14,9 +14,8 @@ fi
 mkdir -p "${MODEL_DIR}"
 
 hf download "${REPO}" \
-  Qwen3.8-27B-UD-Q5_K_M.gguf \
-  mmproj-F16.gguf \
-  MTP/mtp-Qwen3.8-27B-Q4_0.gguf \
+  Qwen3.8-27B-UD-Q6_K_L.gguf \
+  Qwen3.8-27B-UD-Q4_K_XL.gguf \
   --revision "${REVISION}" \
   --local-dir "${MODEL_DIR}" \
-  --max-workers 3
+  --max-workers 2

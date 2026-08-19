@@ -2,6 +2,25 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${PROJECT_DIR}/.env"
+
+# shellcheck source=scripts/lib/load-env.sh
+source "${PROJECT_DIR}/scripts/lib/load-env.sh"
+load_env_defaults "${ENV_FILE}" \
+  QWEN_SERVER_BIN \
+  QWEN_MODEL_FILE \
+  QWEN_MMPROJ_FILE \
+  QWEN_MTP_FILE \
+  QWEN_API_HOST \
+  QWEN_API_PORT \
+  QWEN_CTX_SIZE \
+  QWEN_BATCH_SIZE \
+  QWEN_UBATCH_SIZE \
+  QWEN_MTP_DRAFT_N_MAX \
+  QWEN_LOAD_MODE \
+  QWEN_BACKEND_SAMPLING \
+  QWEN_CUDA_GRAPH_OPT
+
 RUN_DIR="${PROJECT_DIR}/run"
 LOG_DIR="${PROJECT_DIR}/logs"
 PID_FILE="${RUN_DIR}/qwen3.8-27b.pid"

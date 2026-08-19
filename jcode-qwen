@@ -3,10 +3,44 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JCODE_BIN="${PROJECT_DIR}/tools/jcode/jcode"
+ENV_FILE="${PROJECT_DIR}/.env"
+
+# shellcheck source=scripts/lib/load-env.sh
+source "${PROJECT_DIR}/scripts/lib/load-env.sh"
+load_env_defaults "${ENV_FILE}" \
+  QWEN_API_HOST \
+  QWEN_API_PORT \
+  QWEN_CTX_SIZE \
+  QWEN_REASONING_EFFORT \
+  QWEN_REASONING_BUDGET_TOKENS \
+  JCODE_OPENAI_EXTRA_BODY
+
 API_HOST="${QWEN_API_HOST:-127.0.0.1}"
 API_PORT="${QWEN_API_PORT:-30000}"
 CTX_SIZE="${QWEN_CTX_SIZE:-65536}"
 MODEL="Qwen/Qwen3.8-27B"
+REASONING_EFFORT="${QWEN_REASONING_EFFORT:-low}"
+REASONING_BUDGET="${QWEN_REASONING_BUDGET_TOKENS:-2048}"
+
+case "${REASONING_EFFORT}" in
+  none|low|medium|xhigh) ;;
+  *)
+    echo "QWEN_REASONING_EFFORT must be one of: none, low, medium, xhigh." >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! "${REASONING_BUDGET}" =~ ^-?[0-9]+$ ]] || (( REASONING_BUDGET < -1 )); then
+  echo "QWEN_REASONING_BUDGET_TOKENS must be -1 or a non-negative integer." >&2
+  exit 1
+fi
+
+if [[ -z "${JCODE_OPENAI_EXTRA_BODY+x}" ]]; then
+  printf -v JCODE_OPENAI_EXTRA_BODY \
+    '{"reasoning_effort":"%s","reasoning_budget_tokens":%d}' \
+    "${REASONING_EFFORT}" "${REASONING_BUDGET}"
+  export JCODE_OPENAI_EXTRA_BODY
+fi
 
 if [[ ! -x "${JCODE_BIN}" ]]; then
   echo "jcode is not installed. Run ./scripts/install-harnesses.sh first." >&2
