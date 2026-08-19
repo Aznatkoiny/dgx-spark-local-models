@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DSH_BIN="${PROJECT_DIR}/tools/deepseek-harness/node_modules/.bin/dsh"
+TEMPLATE="${PROJECT_DIR}/harnesses/deepseek-harness/qwen-settings.yaml"
+
+if [[ ! -x "${DSH_BIN}" ]]; then
+  echo "DeepSeek Harness is not installed. Run ./scripts/install-harnesses.sh first." >&2
+  exit 1
+fi
+
+export DSH_HOME="${PROJECT_DIR}/run/dsh-qwen"
+export LOCAL_LLM_API_KEY="${LOCAL_LLM_API_KEY:-local-only-placeholder}"
+mkdir -p "${DSH_HOME}"
+if [[ ! -f "${DSH_HOME}/settings.yaml" ]]; then
+  cp "${TEMPLATE}" "${DSH_HOME}/settings.yaml"
+fi
+
+if [[ $# -eq 0 ]]; then
+  set -- web --no-open
+fi
+exec "${DSH_BIN}" "$@"

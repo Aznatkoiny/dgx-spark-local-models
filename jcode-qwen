@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JCODE_BIN="${PROJECT_DIR}/tools/jcode/jcode"
+API_HOST="${QWEN_API_HOST:-127.0.0.1}"
+API_PORT="${QWEN_API_PORT:-30000}"
+CTX_SIZE="${QWEN_CTX_SIZE:-65536}"
+MODEL="Qwen/Qwen3.8-27B"
+
+if [[ ! -x "${JCODE_BIN}" ]]; then
+  echo "jcode is not installed. Run ./scripts/install-harnesses.sh first." >&2
+  exit 1
+fi
+
+export JCODE_HOME="${PROJECT_DIR}/run/jcode-qwen"
+export JCODE_NO_TELEMETRY="${JCODE_NO_TELEMETRY:-1}"
+export JCODE_STREAM_IDLE_TIMEOUT_SECS="${JCODE_STREAM_IDLE_TIMEOUT_SECS:-600}"
+mkdir -p "${JCODE_HOME}"
+
+"${JCODE_BIN}" provider add spark-qwen \
+  --base-url "http://${API_HOST}:${API_PORT}/v1" \
+  --model "${MODEL}" \
+  --no-api-key \
+  --context-window "${CTX_SIZE}" \
+  --overwrite >/dev/null
+
+exec "${JCODE_BIN}" --provider-profile spark-qwen --model "${MODEL}" "$@"

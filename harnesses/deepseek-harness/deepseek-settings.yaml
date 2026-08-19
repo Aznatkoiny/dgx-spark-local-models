@@ -1,0 +1,19 @@
+agent-default-model:
+  provider: deepseek-official
+  model: deepseek-ai/DeepSeek-V4-Flash-0731
+  reasoningEffort: high
+
+llm-deepseek:
+  apiKeyEnv: LOCAL_LLM_API_KEY
+  baseURL: http://127.0.0.1:30001/v1
+  thinking: enabled
+  reasoningEffort: high
+  maxTokens: 4096
+  defaultContextWindow: 8192
+  streamIdleTimeoutMs: 1200000
+  models:
+    - id: deepseek-ai/DeepSeek-V4-Flash-0731
+      name: DeepSeek-V4-Flash-0731 local
+      description: Experimental Q2_K_S GGUF on one DGX Spark
+      contextWindow: 8192
+      maxTokens: 4096

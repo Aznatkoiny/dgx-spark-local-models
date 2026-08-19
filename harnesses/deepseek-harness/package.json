@@ -1,0 +1,7 @@
+{
+  "name": "dgx-spark-deepseek-harness",
+  "private": true,
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.0-rc.8"
+  }
+}

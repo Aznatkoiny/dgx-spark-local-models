@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JCODE_BIN="${PROJECT_DIR}/tools/jcode/jcode"
+API_HOST="${DEEPSEEK_API_HOST:-127.0.0.1}"
+API_PORT="${DEEPSEEK_API_PORT:-30001}"
+CTX_SIZE="${DEEPSEEK_CTX_SIZE:-8192}"
+MODEL="deepseek-ai/DeepSeek-V4-Flash-0731"
+
+if [[ ! -x "${JCODE_BIN}" ]]; then
+  echo "jcode is not installed. Run ./scripts/install-harnesses.sh first." >&2
+  exit 1
+fi
+
+export JCODE_HOME="${PROJECT_DIR}/run/jcode-deepseek"
+export JCODE_NO_TELEMETRY="${JCODE_NO_TELEMETRY:-1}"
+export JCODE_STREAM_IDLE_TIMEOUT_SECS="${JCODE_STREAM_IDLE_TIMEOUT_SECS:-1200}"
+mkdir -p "${JCODE_HOME}"
+
+"${JCODE_BIN}" provider add spark-deepseek \
+  --base-url "http://${API_HOST}:${API_PORT}/v1" \
+  --model "${MODEL}" \
+  --no-api-key \
+  --context-window "${CTX_SIZE}" \
+  --overwrite >/dev/null
+
+exec "${JCODE_BIN}" --provider-profile spark-deepseek --model "${MODEL}" "$@"

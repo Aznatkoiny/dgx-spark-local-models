@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+API_HOST="${QWEN_API_HOST:-127.0.0.1}"
+API_PORT="${QWEN_API_PORT:-30000}"
+CTX_SIZE="${QWEN_CTX_SIZE:-65536}"
+COMPACT_LIMIT="$((CTX_SIZE * 7 / 8))"
+
+exec codex \
+  -c 'model="Qwen/Qwen3.8-27B"' \
+  -c 'model_provider="qwen_local"' \
+  -c 'model_providers.qwen_local.name="Qwen local"' \
+  -c "model_providers.qwen_local.base_url=\"http://${API_HOST}:${API_PORT}/v1\"" \
+  -c 'model_providers.qwen_local.wire_api="responses"' \
+  -c 'model_providers.qwen_local.requires_openai_auth=false' \
+  -c "model_catalog_json=\"${PROJECT_DIR}/codex-models.json\"" \
+  -c "model_context_window=${CTX_SIZE}" \
+  -c "model_auto_compact_token_limit=${COMPACT_LIMIT}" \
+  -c 'model_supports_reasoning_summaries=false' \
+  -c 'model_reasoning_effort="medium"' \
+  "$@"
