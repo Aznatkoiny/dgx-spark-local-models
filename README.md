@@ -164,3 +164,7 @@ The llama.cpp build follows NVIDIA's [DGX Spark recipe](https://build.nvidia.com
 - DeepSeek GGUF revision: `f559fd6005309e5f6bd650342ee8711ff189b3b8`
 
 The source-backed feasibility and compatibility notes are in [the research report](docs/multi-harness-deepseek-research.md).
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
